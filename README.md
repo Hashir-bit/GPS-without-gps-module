@@ -157,6 +157,37 @@ Connect the **MPU6050 sensor** to your **ESP32** using female-to-female jumper w
 
 ---
 
+## 🛠️ Dashboard Architecture & Technical Concept
+
+The live telemetry dashboard (`dashboard_server.py`) is built as a zero-dependency, lightweight web application:
+
+| Tech Layer | Framework / Technology | Purpose |
+| :--- | :--- | :--- |
+| **Backend Server** | **Python (`http.server` & `socketserver`)** | Lightweight REST API server on Port `8000` to serve HTML interface and receive ESP32 JSON data. |
+| **Interactive Map** | **Leaflet.js (`leaflet@1.9.4`)** | Open-source JS mapping engine for smooth map panning, trajectory line drawing, and node marker updates. |
+| **Map Vector Tiles** | **CartoDB Voyager** | Clean light-theme street vector map tiles (No paid Google Maps API key required for UI). |
+| **UI Aesthetics** | **HTML5 + CSS3 (Glassmorphism)** | Translucent glass panel cards (`backdrop-filter: blur()`), royal blue accents (`#2563eb`), and animated pulse markers. |
+| **Data Protocol** | **REST JSON API over HTTP** | Fast payload transfer between ESP32 hardware and laptop web browser. |
+
+### 🔄 Data Pipeline Flow
+
+```
++--------------------------+       HTTP POST /api/telemetry       +--------------------------+
+|  ESP32 (MPU6050 + WiFi)  | -----------------------------------> |  Python Server (Port 8000)|
+|  - Step Detection        |         (JSON Telemetry)             |  - Updates State in RAM  |
+|  - Gyro Z Heading        |                                      +--------------------------+
+|  - Google WiFi Lat/Lng   |                                                   |
++--------------------------+                                                   | HTTP GET /api/telemetry
+                                                                               v
+                                                                  +--------------------------+
+                                                                  |  Web Browser (Leaflet.js)|
+                                                                  |  - Animated Blue Marker  |
+                                                                  |  - Real-Time Trajectory  |
+                                                                  +--------------------------+
+```
+
+---
+
 ## 🎓 Ideathon Pitch Q&A Cheat-Sheet for Presenters
 
 1. **Q: Why use this over a traditional GPS module (e.g., NEO-6M)?**
@@ -165,3 +196,5 @@ Connect the **MPU6050 sensor** to your **ESP32** using female-to-female jumper w
    - *A:* PDR is accurate over short distances ($\sim 1\text{--}5$ meters), but requires periodic absolute origin recalibration via WiFi API every 8--15 seconds to correct drift.
 3. **Q: How does the system handle missing internet/WiFi?**
    - *A:* The tracker switches to pure relative tracking $(\Delta X, \Delta Y)$ and buffers movement vectors locally until a network or BLE beacon origin is found.
+4. **Q: How does the dashboard update in real-time?**
+   - *A:* The ESP32 posts JSON telemetry payloads over HTTP POST to an asynchronous Python REST server. The frontend Leaflet.js engine polls the endpoint every 1.5 seconds, smoothly panning the map and extending the live path polyline.
