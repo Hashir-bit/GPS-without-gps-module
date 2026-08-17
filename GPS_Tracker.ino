@@ -15,8 +15,7 @@ const char* password = "atkaresam123";
 const char* GOOGLE_API_KEY = "AIzaSyB9WQW_b6lyWzUGraREahHUOR12Cdmvui8";
 
 // Dashboard Server Telemetry Endpoint
-// IMPORTANT: Replace "YOUR_LAPTOP_IP" below with the IP address of the laptop running dashboard_server.py!
-// Example: "http://192.168.1.15:8000/api/telemetry"
+// Replace "YOUR_LAPTOP_IP" below with the IP address of the laptop running dashboard_server.py!
 const char* DASHBOARD_SERVER_URL = "http://YOUR_LAPTOP_IP:8000/api/telemetry";
 
 // ================================================================
@@ -90,18 +89,12 @@ void sendTelemetryToDashboard(double lat, double lng, int steps, float headDeg, 
 // FUNCTION: WRITE MPU REGISTER
 // ================================================================
 
-bool writeRegister(
-    uint8_t reg,
-    uint8_t value
-)
+bool writeRegister(uint8_t reg, uint8_t value)
 {
     Wire.beginTransmission(MPU_ADDR);
-
     Wire.write(reg);
     Wire.write(value);
-
     uint8_t error = Wire.endTransmission();
-
     return error == 0;
 }
 
@@ -109,27 +102,16 @@ bool writeRegister(
 // FUNCTION: READ MPU REGISTERS
 // ================================================================
 
-bool readRegisters(
-    uint8_t startReg,
-    uint8_t* buffer,
-    uint8_t length
-)
+bool readRegisters(uint8_t startReg, uint8_t* buffer, uint8_t length)
 {
     Wire.beginTransmission(MPU_ADDR);
-
     Wire.write(startReg);
-
     if (Wire.endTransmission(false) != 0)
     {
         return false;
     }
 
-    uint8_t received =
-        Wire.requestFrom(
-            (uint8_t)MPU_ADDR,
-            length
-        );
-
+    uint8_t received = Wire.requestFrom((uint8_t)MPU_ADDR, length);
     if (received != length)
     {
         return false;
@@ -150,12 +132,10 @@ bool readRegisters(
 uint8_t readRegister(uint8_t reg)
 {
     uint8_t value = 0;
-
     if (!readRegisters(reg, &value, 1))
     {
         return 0xFF;
     }
-
     return value;
 }
 
@@ -164,7 +144,6 @@ uint8_t readRegister(uint8_t reg)
 // ================================================================
 
 void calibrateGyro() {
-    Serial.println("Calibrating Gyroscope... Keep sensor stationary!");
     long sumGz = 0;
     int samples = 200;
 
@@ -180,8 +159,6 @@ void calibrateGyro() {
     float avgRawGz = (float)sumGz / samples;
     float gzDeg = avgRawGz / GYRO_SCALE;
     gzOffset = gzDeg * PI / 180.0;
-
-    Serial.printf("Gyro Z offset calibrated: %.4f rad/s\n", gzOffset);
 }
 
 // ================================================================
@@ -190,110 +167,40 @@ void calibrateGyro() {
 
 bool initializeMPU()
 {
-    Serial.println();
-    Serial.println("Checking MPU6050...");
-
-    uint8_t whoAmI =
-        readRegister(REG_WHO_AM_I);
-
-    Serial.print("WHO_AM_I = 0x");
-
-    if (whoAmI < 16)
-    {
-        Serial.print("0");
-    }
-
-    Serial.println(whoAmI, HEX);
+    uint8_t whoAmI = readRegister(REG_WHO_AM_I);
 
     if (whoAmI == 0xFF)
     {
-        Serial.println(
-            "Could not communicate with MPU6050."
-        );
-
         return false;
-    }
-
-    if (whoAmI != 0x68 && whoAmI != 0x70)
-    {
-        Serial.println(
-            "Warning: unexpected WHO_AM_I value."
-        );
     }
 
     // Wake MPU6050
-    Serial.println("Waking MPU6050...");
-
-    if (!writeRegister(
-            REG_PWR_MGMT_1,
-            0x00
-        ))
+    if (!writeRegister(REG_PWR_MGMT_1, 0x00))
     {
-        Serial.println(
-            "Failed to wake MPU6050."
-        );
-
         return false;
     }
-
     delay(100);
 
     // Accelerometer ±8G
-    if (!writeRegister(
-            REG_ACCEL_CONFIG,
-            0x10
-        ))
+    if (!writeRegister(REG_ACCEL_CONFIG, 0x10))
     {
-        Serial.println(
-            "Accelerometer configuration failed."
-        );
-
         return false;
     }
 
     // Gyroscope ±500 deg/s
-    if (!writeRegister(
-            REG_GYRO_CONFIG,
-            0x08
-        ))
+    if (!writeRegister(REG_GYRO_CONFIG, 0x08))
     {
-        Serial.println(
-            "Gyroscope configuration failed."
-        );
-
         return false;
     }
 
     // Digital low pass filter
-    if (!writeRegister(
-            REG_CONFIG,
-            0x04
-        ))
+    if (!writeRegister(REG_CONFIG, 0x04))
     {
-        Serial.println(
-            "Filter configuration failed."
-        );
-
         return false;
     }
 
     delay(100);
-
     calibrateGyro();
-
-    Serial.println();
-    Serial.println(
-        "MPU6050 initialized successfully!"
-    );
-
-    Serial.println(
-        "Accelerometer : +/-8G"
-    );
-
-    Serial.println(
-        "Gyroscope     : +/-500 deg/s"
-    );
-
     return true;
 }
 
@@ -301,22 +208,11 @@ bool initializeMPU()
 // FUNCTION: READ MPU6050 DATA
 // ================================================================
 
-bool readMPU(
-    float &ax,
-    float &ay,
-    float &az,
-    float &gx,
-    float &gy,
-    float &gz
-)
+bool readMPU(float &ax, float &ay, float &az, float &gx, float &gy, float &gz)
 {
     uint8_t data[14];
 
-    if (!readRegisters(
-            REG_ACCEL_XOUT_H,
-            data,
-            14
-        ))
+    if (!readRegisters(REG_ACCEL_XOUT_H, data, 14))
     {
         return false;
     }
@@ -354,13 +250,9 @@ bool readMPU(
 // FUNCTION: CONVERT LOCAL X/Y TO LAT/LNG
 // ================================================================
 
-void getCurrentLatLng(
-    double &lat,
-    double &lng
-)
+void getCurrentLatLng(double &lat, double &lng)
 {
     const double metersPerDegLat = 111320.0;
-
     double metersPerDegLng = 111320.0 * cos(originLat * PI / 180.0);
 
     lat = originLat + (posY / metersPerDegLat);
@@ -381,18 +273,12 @@ void getCurrentLatLng(
 
 bool getWifiFix()
 {
-    Serial.println();
-    Serial.println("Scanning Wi-Fi networks...");
-
     int n = WiFi.scanNetworks(false, true);
 
     if (n <= 0)
     {
-        Serial.println("No Wi-Fi networks found.");
         return false;
     }
-
-    Serial.printf("Wi-Fi networks found: %d\n", n);
 
 #if ARDUINOJSON_VERSION_MAJOR >= 7
     JsonDocument doc;
@@ -413,8 +299,6 @@ bool getWifiFix()
 #endif
         ap["macAddress"] = WiFi.BSSIDstr(i);
         ap["signalStrength"] = WiFi.RSSI(i);
-
-        Serial.printf("%d. %s   RSSI: %d dBm\n", i + 1, WiFi.BSSIDstr(i).c_str(), WiFi.RSSI(i));
     }
 
     String requestBody;
@@ -429,25 +313,16 @@ bool getWifiFix()
 
     if (!http.begin(client, url))
     {
-        Serial.println("HTTPS connection failed.");
         WiFi.scanDelete();
         return false;
     }
 
     http.addHeader("Content-Type", "application/json");
-    Serial.println("Sending Wi-Fi data to Google...");
 
     int httpCode = http.POST(requestBody);
 
     if (httpCode != 200)
     {
-        Serial.println();
-        Serial.println("Google Geolocation request FAILED.");
-        Serial.printf("HTTP code: %d\n", httpCode);
-
-        String response = http.getString();
-        Serial.println(response);
-
         http.end();
         WiFi.scanDelete();
         return false;
@@ -465,8 +340,6 @@ bool getWifiFix()
 
     if (error)
     {
-        Serial.print("JSON error: ");
-        Serial.println(error.c_str());
         http.end();
         WiFi.scanDelete();
         return false;
@@ -481,7 +354,6 @@ bool getWifiFix()
 
     if (newLat == 0.0 && newLng == 0.0)
     {
-        Serial.println("Invalid Wi-Fi location.");
         return false;
     }
 
@@ -492,20 +364,6 @@ bool getWifiFix()
     posY = 0.0;
 
     haveFix = true;
-
-    Serial.println();
-    Serial.println("=========================================");
-    Serial.println("          WIFI POSITION UPDATED");
-    Serial.println("=========================================");
-    Serial.printf("Step Count    : %d\n", stepCount);
-    Serial.printf("Latitude      : %.6f\n", originLat);
-    Serial.printf("Longitude     : %.6f\n", originLng);
-
-    if (accuracy > 0)
-    {
-        Serial.printf("Accuracy      : %.2f meters\n", accuracy);
-    }
-    Serial.println("=========================================");
 
     // Post updated WiFi location fix immediately to Dashboard
     sendTelemetryToDashboard(originLat, originLng, stepCount, heading * 180.0 / PI, posX, posY, 9.81);
@@ -551,12 +409,7 @@ void sendTelemetryToDashboard(
     String requestBody;
     serializeJson(doc, requestBody);
 
-    int httpCode = http.POST(requestBody);
-    if (httpCode == 200) {
-        Serial.println("Telemetry posted to Dashboard successfully.");
-    } else {
-        Serial.printf("Dashboard POST status code: %d\n", httpCode);
-    }
+    http.POST(requestBody);
     http.end();
 }
 
@@ -580,30 +433,6 @@ void processStep(float accelerationMagnitude)
         getCurrentLatLng(currentLat, currentLng);
     }
 
-    Serial.println();
-    Serial.println("*****************************************");
-    Serial.printf("STEP %d DETECTED\n", stepCount);
-    Serial.printf("Acceleration : %.2f m/s^2\n", accelerationMagnitude);
-    Serial.printf("Heading      : %.2f degrees\n", heading * 180.0 / PI);
-    Serial.printf("Step Length  : %.2f m\n", STEP_LENGTH_M);
-    Serial.printf("Total Steps  : %d\n", stepCount);
-    Serial.printf("Distance     : %.2f m\n", stepCount * STEP_LENGTH_M);
-    Serial.printf("Offset X     : %.2f m\n", posX);
-    Serial.printf("Offset Y     : %.2f m\n", posY);
-
-    if (haveFix)
-    {
-        Serial.printf("Latitude     : %.6f\n", currentLat);
-        Serial.printf("Longitude    : %.6f\n", currentLng);
-    }
-    else
-    {
-        Serial.println("Latitude     : No Wi-Fi fix");
-        Serial.println("Longitude    : No Wi-Fi fix");
-    }
-
-    Serial.println("*****************************************");
-
     // Post step telemetry to Python Dashboard
     sendTelemetryToDashboard(
         currentLat,
@@ -618,13 +447,7 @@ void processStep(float accelerationMagnitude)
     // WiFi Location recalibration check after this step
     if (WiFi.status() == WL_CONNECTED)
     {
-        Serial.println();
-        Serial.printf("Updating Wi-Fi position after Step %d...\n", stepCount);
         getWifiFix();
-    }
-    else
-    {
-        Serial.println("Wi-Fi unavailable. Continuing with MPU6050 dead reckoning.");
     }
 }
 
@@ -639,7 +462,6 @@ void updateIMU()
 
     if (!readMPU(ax, ay, az, gx, gy, gz))
     {
-        Serial.println("MPU read error!");
         return;
     }
 
@@ -702,25 +524,22 @@ void setup()
     Serial.begin(115200);
     delay(1000);
 
+    // ONLY print the Dashboard URL to Serial Monitor
     Serial.println();
-    Serial.println("=========================================");
-    Serial.println("       GPS-LESS ESP32 TRACKER");
-    Serial.println("=========================================");
+    Serial.print("DASHBOARD URL: ");
+    Serial.println(DASHBOARD_SERVER_URL);
 
-    Serial.println("\nStarting I2C...");
     Wire.begin(21, 22);
     Wire.setClock(400000);
 
     if (!initializeMPU())
     {
-        Serial.println("\nMPU6050 initialization failed.");
         while (true)
         {
             delay(1000);
         }
     }
 
-    Serial.println("\nConnecting to Wi-Fi...");
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
 
@@ -728,37 +547,16 @@ void setup()
     while (WiFi.status() != WL_CONNECTED && attempts < 40)
     {
         delay(500);
-        Serial.print(".");
         attempts++;
     }
 
-    Serial.println();
-
     if (WiFi.status() == WL_CONNECTED)
     {
-        Serial.println("Wi-Fi connected!");
-        Serial.print("IP address: ");
-        Serial.println(WiFi.localIP());
-
-        Serial.println("\nObtaining initial Wi-Fi location...");
         getWifiFix();
-    }
-    else
-    {
-        Serial.println("Wi-Fi connection failed. MPU6050 step tracking will continue.");
     }
 
     lastImuTime = millis();
     lastStepTime = 0;
-
-    Serial.println();
-    Serial.println("=========================================");
-    Serial.println("          SETUP COMPLETE");
-    Serial.println("=========================================");
-    Serial.print("Dashboard Telemetry Target: ");
-    Serial.println(DASHBOARD_SERVER_URL);
-    Serial.println("Start walking!");
-    Serial.println();
 }
 
 // ================================================================
