@@ -6,7 +6,7 @@
 #include <math.h>
 
 // ================================================================
-// WIFI & DASHBOARD SETTINGS
+// WIFI SETTINGS
 // ================================================================
 
 const char* ssid = "iPhone";
@@ -15,7 +15,7 @@ const char* password = "atkaresam123";
 const char* GOOGLE_API_KEY = "AIzaSyB9WQW_b6lyWzUGraREahHUOR12Cdmvui8";
 
 // Dashboard Server Telemetry Endpoint
-// Replace "YOUR_LAPTOP_IP" below with the IP address of the laptop running dashboard_server.py!
+// IMPORTANT: Replace "YOUR_LAPTOP_IP" below with the IP address of the laptop running dashboard_server.py!
 const char* DASHBOARD_SERVER_URL = "http://YOUR_LAPTOP_IP:8000/api/telemetry";
 
 // ================================================================
@@ -72,9 +72,6 @@ bool haveFix = false;
 
 int stepCount = 0;
 
-// Gyro Z offset calibration variable
-float gzOffset = 0.0;
-
 // ================================================================
 // TIMERS
 // ================================================================
@@ -89,12 +86,18 @@ void sendTelemetryToDashboard(double lat, double lng, int steps, float headDeg, 
 // FUNCTION: WRITE MPU REGISTER
 // ================================================================
 
-bool writeRegister(uint8_t reg, uint8_t value)
+bool writeRegister(
+    uint8_t reg,
+    uint8_t value
+)
 {
     Wire.beginTransmission(MPU_ADDR);
+
     Wire.write(reg);
     Wire.write(value);
+
     uint8_t error = Wire.endTransmission();
+
     return error == 0;
 }
 
@@ -102,16 +105,27 @@ bool writeRegister(uint8_t reg, uint8_t value)
 // FUNCTION: READ MPU REGISTERS
 // ================================================================
 
-bool readRegisters(uint8_t startReg, uint8_t* buffer, uint8_t length)
+bool readRegisters(
+    uint8_t startReg,
+    uint8_t* buffer,
+    uint8_t length
+)
 {
     Wire.beginTransmission(MPU_ADDR);
+
     Wire.write(startReg);
+
     if (Wire.endTransmission(false) != 0)
     {
         return false;
     }
 
-    uint8_t received = Wire.requestFrom((uint8_t)MPU_ADDR, length);
+    uint8_t received =
+        Wire.requestFrom(
+            MPU_ADDR,
+            length
+        );
+
     if (received != length)
     {
         return false;
@@ -132,33 +146,13 @@ bool readRegisters(uint8_t startReg, uint8_t* buffer, uint8_t length)
 uint8_t readRegister(uint8_t reg)
 {
     uint8_t value = 0;
+
     if (!readRegisters(reg, &value, 1))
     {
         return 0xFF;
     }
+
     return value;
-}
-
-// ================================================================
-// FUNCTION: CALIBRATE GYRO Z-AXIS DRIFT
-// ================================================================
-
-void calibrateGyro() {
-    long sumGz = 0;
-    int samples = 200;
-
-    for (int i = 0; i < samples; i++) {
-        uint8_t data[2];
-        if (readRegisters(0x47, data, 2)) {
-            int16_t rawGz = ((int16_t)data[0] << 8) | data[1];
-            sumGz += rawGz;
-        }
-        delay(5);
-    }
-
-    float avgRawGz = (float)sumGz / samples;
-    float gzDeg = avgRawGz / GYRO_SCALE;
-    gzOffset = gzDeg * PI / 180.0;
 }
 
 // ================================================================
@@ -167,7 +161,8 @@ void calibrateGyro() {
 
 bool initializeMPU()
 {
-    uint8_t whoAmI = readRegister(REG_WHO_AM_I);
+    uint8_t whoAmI =
+        readRegister(REG_WHO_AM_I);
 
     if (whoAmI == 0xFF)
     {
@@ -175,32 +170,45 @@ bool initializeMPU()
     }
 
     // Wake MPU6050
-    if (!writeRegister(REG_PWR_MGMT_1, 0x00))
+    if (!writeRegister(
+            REG_PWR_MGMT_1,
+            0x00
+        ))
     {
         return false;
     }
+
     delay(100);
 
     // Accelerometer ±8G
-    if (!writeRegister(REG_ACCEL_CONFIG, 0x10))
+    if (!writeRegister(
+            REG_ACCEL_CONFIG,
+            0x10
+        ))
     {
         return false;
     }
 
     // Gyroscope ±500 deg/s
-    if (!writeRegister(REG_GYRO_CONFIG, 0x08))
+    if (!writeRegister(
+            REG_GYRO_CONFIG,
+            0x08
+        ))
     {
         return false;
     }
 
     // Digital low pass filter
-    if (!writeRegister(REG_CONFIG, 0x04))
+    if (!writeRegister(
+            REG_CONFIG,
+            0x04
+        ))
     {
         return false;
     }
 
     delay(100);
-    calibrateGyro();
+
     return true;
 }
 
@@ -208,40 +216,86 @@ bool initializeMPU()
 // FUNCTION: READ MPU6050 DATA
 // ================================================================
 
-bool readMPU(float &ax, float &ay, float &az, float &gx, float &gy, float &gz)
+bool readMPU(
+    float &ax,
+    float &ay,
+    float &az,
+    float &gx,
+    float &gy,
+    float &gz
+)
 {
     uint8_t data[14];
 
-    if (!readRegisters(REG_ACCEL_XOUT_H, data, 14))
+    if (!readRegisters(
+            REG_ACCEL_XOUT_H,
+            data,
+            14
+        ))
     {
         return false;
     }
 
-    int16_t rawAx = ((int16_t)data[0] << 8) | data[1];
-    int16_t rawAy = ((int16_t)data[2] << 8) | data[3];
-    int16_t rawAz = ((int16_t)data[4] << 8) | data[5];
+    int16_t rawAx =
+        ((int16_t)data[0] << 8) |
+        data[1];
 
-    int16_t rawGx = ((int16_t)data[8] << 8) | data[9];
-    int16_t rawGy = ((int16_t)data[10] << 8) | data[11];
-    int16_t rawGz = ((int16_t)data[12] << 8) | data[13];
+    int16_t rawAy =
+        ((int16_t)data[2] << 8) |
+        data[3];
+
+    int16_t rawAz =
+        ((int16_t)data[4] << 8) |
+        data[5];
+
+    int16_t rawGx =
+        ((int16_t)data[8] << 8) |
+        data[9];
+
+    int16_t rawGy =
+        ((int16_t)data[10] << 8) |
+        data[11];
+
+    int16_t rawGz =
+        ((int16_t)data[12] << 8) |
+        data[13];
 
     // Convert acceleration to m/s²
-    float axG = rawAx / ACCEL_SCALE;
-    float ayG = rawAy / ACCEL_SCALE;
-    float azG = rawAz / ACCEL_SCALE;
+
+    float axG =
+        rawAx / ACCEL_SCALE;
+
+    float ayG =
+        rawAy / ACCEL_SCALE;
+
+    float azG =
+        rawAz / ACCEL_SCALE;
 
     ax = axG * 9.80665;
     ay = ayG * 9.80665;
     az = azG * 9.80665;
 
-    // Convert gyro to deg/s and subtract calibrated offset
-    float gxDeg = rawGx / GYRO_SCALE;
-    float gyDeg = rawGy / GYRO_SCALE;
-    float gzDeg = rawGz / GYRO_SCALE;
+    // Convert gyro to deg/s
 
-    gx = gxDeg * PI / 180.0;
-    gy = gyDeg * PI / 180.0;
-    gz = (gzDeg * PI / 180.0) - gzOffset;
+    float gxDeg =
+        rawGx / GYRO_SCALE;
+
+    float gyDeg =
+        rawGy / GYRO_SCALE;
+
+    float gzDeg =
+        rawGz / GYRO_SCALE;
+
+    // Convert deg/s to rad/s
+
+    gx =
+        gxDeg * PI / 180.0;
+
+    gy =
+        gyDeg * PI / 180.0;
+
+    gz =
+        gzDeg * PI / 180.0;
 
     return true;
 }
@@ -250,16 +304,37 @@ bool readMPU(float &ax, float &ay, float &az, float &gx, float &gy, float &gz)
 // FUNCTION: CONVERT LOCAL X/Y TO LAT/LNG
 // ================================================================
 
-void getCurrentLatLng(double &lat, double &lng)
+void getCurrentLatLng(
+    double &lat,
+    double &lng
+)
 {
-    const double metersPerDegLat = 111320.0;
-    double metersPerDegLng = 111320.0 * cos(originLat * PI / 180.0);
+    const double metersPerDegLat =
+        111320.0;
 
-    lat = originLat + (posY / metersPerDegLat);
+    double metersPerDegLng =
+        111320.0 *
+        cos(
+            originLat *
+            PI /
+            180.0
+        );
+
+    lat =
+        originLat +
+        (
+            posY /
+            metersPerDegLat
+        );
 
     if (fabs(metersPerDegLng) > 0.000001)
     {
-        lng = originLng + (posX / metersPerDegLng);
+        lng =
+            originLng +
+            (
+                posX /
+                metersPerDegLng
+            );
     }
     else
     {
@@ -268,111 +343,7 @@ void getCurrentLatLng(double &lat, double &lng)
 }
 
 // ================================================================
-// FUNCTION: WIFI LOCATION (Supports ArduinoJson v6 and v7)
-// ================================================================
-
-bool getWifiFix()
-{
-    int n = WiFi.scanNetworks(false, true);
-
-    if (n <= 0)
-    {
-        return false;
-    }
-
-#if ARDUINOJSON_VERSION_MAJOR >= 7
-    JsonDocument doc;
-    JsonArray accessPoints = doc["wifiAccessPoints"].to<JsonArray>();
-#else
-    DynamicJsonDocument doc(4096);
-    JsonArray accessPoints = doc.createNestedArray("wifiAccessPoints");
-#endif
-
-    int count = min(n, 10);
-
-    for (int i = 0; i < count; i++)
-    {
-#if ARDUINOJSON_VERSION_MAJOR >= 7
-        JsonObject ap = accessPoints.add<JsonObject>();
-#else
-        JsonObject ap = accessPoints.createNestedObject();
-#endif
-        ap["macAddress"] = WiFi.BSSIDstr(i);
-        ap["signalStrength"] = WiFi.RSSI(i);
-    }
-
-    String requestBody;
-    serializeJson(doc, requestBody);
-
-    String url = String("https://www.googleapis.com/geolocation/v1/geolocate?key=") + GOOGLE_API_KEY;
-
-    WiFiClientSecure client;
-    client.setInsecure();
-
-    HTTPClient http;
-
-    if (!http.begin(client, url))
-    {
-        WiFi.scanDelete();
-        return false;
-    }
-
-    http.addHeader("Content-Type", "application/json");
-
-    int httpCode = http.POST(requestBody);
-
-    if (httpCode != 200)
-    {
-        http.end();
-        WiFi.scanDelete();
-        return false;
-    }
-
-    String response = http.getString();
-
-#if ARDUINOJSON_VERSION_MAJOR >= 7
-    JsonDocument responseDoc;
-#else
-    DynamicJsonDocument responseDoc(2048);
-#endif
-
-    DeserializationError error = deserializeJson(responseDoc, response);
-
-    if (error)
-    {
-        http.end();
-        WiFi.scanDelete();
-        return false;
-    }
-
-    double newLat = responseDoc["location"]["lat"];
-    double newLng = responseDoc["location"]["lng"];
-    double accuracy = responseDoc["accuracy"];
-
-    http.end();
-    WiFi.scanDelete();
-
-    if (newLat == 0.0 && newLng == 0.0)
-    {
-        return false;
-    }
-
-    originLat = newLat;
-    originLng = newLng;
-
-    posX = 0.0;
-    posY = 0.0;
-
-    haveFix = true;
-
-    // Post updated WiFi location fix immediately to Dashboard
-    sendTelemetryToDashboard(originLat, originLng, stepCount, heading * 180.0 / PI, posX, posY, 9.81);
-
-    return true;
-}
-
-// ================================================================
-// FUNCTION: SEND TELEMETRY JSON TO DASHBOARD SERVER
+// FUNCTION: SEND TELEMETRY TO DASHBOARD
 // ================================================================
 
 void sendTelemetryToDashboard(
@@ -414,26 +385,201 @@ void sendTelemetryToDashboard(
 }
 
 // ================================================================
+// FUNCTION: WIFI LOCATION
+// ================================================================
+
+bool getWifiFix()
+{
+    int n =
+        WiFi.scanNetworks(
+            false,
+            true
+        );
+
+    if (n <= 0)
+    {
+        return false;
+    }
+
+#if ARDUINOJSON_VERSION_MAJOR >= 7
+    JsonDocument doc;
+    JsonArray accessPoints = doc["wifiAccessPoints"].to<JsonArray>();
+#else
+    DynamicJsonDocument doc(4096);
+    JsonArray accessPoints = doc.createNestedArray("wifiAccessPoints");
+#endif
+
+    int count =
+        min(n, 10);
+
+    for (
+        int i = 0;
+        i < count;
+        i++
+    )
+    {
+#if ARDUINOJSON_VERSION_MAJOR >= 7
+        JsonObject ap = accessPoints.add<JsonObject>();
+#else
+        JsonObject ap = accessPoints.createNestedObject();
+#endif
+
+        ap["macAddress"] =
+            WiFi.BSSIDstr(i);
+
+        ap["signalStrength"] =
+            WiFi.RSSI(i);
+    }
+
+    String requestBody;
+
+    serializeJson(
+        doc,
+        requestBody
+    );
+
+    // ============================================================
+    // GOOGLE GEOLOCATION API
+    // ============================================================
+
+    String url =
+        String(
+            "https://www.googleapis.com/geolocation/v1/geolocate?key="
+        ) +
+        GOOGLE_API_KEY;
+
+    WiFiClientSecure client;
+
+    client.setInsecure();
+
+    HTTPClient http;
+
+    if (!http.begin(
+            client,
+            url
+        ))
+    {
+        WiFi.scanDelete();
+
+        return false;
+    }
+
+    http.addHeader(
+        "Content-Type",
+        "application/json"
+    );
+
+    int httpCode =
+        http.POST(
+            requestBody
+        );
+
+    if (httpCode != 200)
+    {
+        http.end();
+
+        WiFi.scanDelete();
+
+        return false;
+    }
+
+    String response =
+        http.getString();
+
+#if ARDUINOJSON_VERSION_MAJOR >= 7
+    JsonDocument responseDoc;
+#else
+    DynamicJsonDocument responseDoc(2048);
+#endif
+
+    DeserializationError error =
+        deserializeJson(
+            responseDoc,
+            response
+        );
+
+    if (error)
+    {
+        http.end();
+
+        WiFi.scanDelete();
+
+        return false;
+    }
+
+    double newLat =
+        responseDoc["location"]["lat"];
+
+    double newLng =
+        responseDoc["location"]["lng"];
+
+    http.end();
+
+    WiFi.scanDelete();
+
+    if (
+        newLat == 0.0 &&
+        newLng == 0.0
+    )
+    {
+        return false;
+    }
+
+    originLat = newLat;
+    originLng = newLng;
+
+    posX = 0.0;
+    posY = 0.0;
+
+    haveFix = true;
+
+    // Send updated location to dashboard
+    sendTelemetryToDashboard(
+        originLat,
+        originLng,
+        stepCount,
+        heading * 180.0 / PI,
+        posX,
+        posY,
+        9.81
+    );
+
+    return true;
+}
+
+// ================================================================
 // FUNCTION: PROCESS ONE STEP
 // ================================================================
 
-void processStep(float accelerationMagnitude)
+void processStep(
+    float accelerationMagnitude
+)
 {
+    // Increment step counter
     stepCount++;
 
-    // Dead Reckoning Navigation Coordinates
-    posX += STEP_LENGTH_M * sin(heading);
-    posY += STEP_LENGTH_M * cos(heading);
+    // Add step to dead-reckoned offset
+    posX +=
+        STEP_LENGTH_M *
+        cos(heading);
 
-    double currentLat = originLat;
-    double currentLng = originLng;
+    posY +=
+        STEP_LENGTH_M *
+        sin(heading);
+
+    // Current estimated position
+    double currentLat = 0.0;
+    double currentLng = 0.0;
 
     if (haveFix)
     {
-        getCurrentLatLng(currentLat, currentLng);
+        getCurrentLatLng(
+            currentLat,
+            currentLng
+        );
     }
 
-    // Post step telemetry to Python Dashboard
+    // Send telemetry to Dashboard
     sendTelemetryToDashboard(
         currentLat,
         currentLng,
@@ -444,8 +590,11 @@ void processStep(float accelerationMagnitude)
         accelerationMagnitude
     );
 
-    // WiFi Location recalibration check after this step
-    if (WiFi.status() == WL_CONNECTED)
+    // Wifi Location update after this step
+    if (
+        WiFi.status() ==
+        WL_CONNECTED
+    )
     {
         getWifiFix();
     }
@@ -457,15 +606,28 @@ void processStep(float accelerationMagnitude)
 
 void updateIMU()
 {
-    float ax, ay, az;
-    float gx, gy, gz;
+    float ax;
+    float ay;
+    float az;
 
-    if (!readMPU(ax, ay, az, gx, gy, gz))
+    float gx;
+    float gy;
+    float gz;
+
+    if (!readMPU(
+            ax,
+            ay,
+            az,
+            gx,
+            gy,
+            gz
+        ))
     {
         return;
     }
 
-    unsigned long now = millis();
+    unsigned long now =
+        millis();
 
     if (lastImuTime == 0)
     {
@@ -473,7 +635,13 @@ void updateIMU()
         return;
     }
 
-    float dt = (now - lastImuTime) / 1000.0;
+    float dt =
+        (
+            now -
+            lastImuTime
+        ) /
+        1000.0;
+
     lastImuTime = now;
 
     if (dt > 0.1)
@@ -481,34 +649,66 @@ void updateIMU()
         dt = 0.1;
     }
 
-    // Heading Integration
-    heading += gz * dt;
+    // Heading
+    heading +=
+        gz *
+        dt;
 
-    heading = fmod(heading, 2.0 * PI);
-    if (heading < 0)
+    while (
+        heading >=
+        2.0 * PI
+    )
     {
-        heading += 2.0 * PI;
+        heading -=
+            2.0 * PI;
     }
 
-    // Total Acceleration Magnitude
-    float accelerationMagnitude = sqrt(ax * ax + ay * ay + az * az);
+    while (
+        heading < 0
+    )
+    {
+        heading +=
+            2.0 * PI;
+    }
 
-    // Step Peak Detection
+    // Total acceleration
+    float accelerationMagnitude =
+        sqrt(
+            ax * ax +
+            ay * ay +
+            az * az
+        );
+
+    // Step peak detection
     if (!stepPeakDetected)
     {
-        if (accelerationMagnitude > STEP_THRESHOLD_HIGH)
+        if (
+            accelerationMagnitude >
+            STEP_THRESHOLD_HIGH
+        )
         {
-            if (now - lastStepTime > STEP_MIN_INTERVAL_MS)
+            if (
+                now -
+                lastStepTime >
+                STEP_MIN_INTERVAL_MS
+            )
             {
                 stepPeakDetected = true;
+
                 lastStepTime = now;
-                processStep(accelerationMagnitude);
+
+                processStep(
+                    accelerationMagnitude
+                );
             }
         }
     }
     else
     {
-        if (accelerationMagnitude < STEP_THRESHOLD_LOW)
+        if (
+            accelerationMagnitude <
+            STEP_THRESHOLD_LOW
+        )
         {
             stepPeakDetected = false;
         }
@@ -521,7 +721,10 @@ void updateIMU()
 
 void setup()
 {
-    Serial.begin(115200);
+    Serial.begin(
+        115200
+    );
+
     delay(1000);
 
     // ONLY print the Dashboard URL to Serial Monitor
@@ -529,9 +732,17 @@ void setup()
     Serial.print("DASHBOARD URL: ");
     Serial.println(DASHBOARD_SERVER_URL);
 
-    Wire.begin(21, 22);
-    Wire.setClock(400000);
+    // I2C
+    Wire.begin(
+        21,
+        22
+    );
 
+    Wire.setClock(
+        400000
+    );
+
+    // MPU6050
     if (!initializeMPU())
     {
         while (true)
@@ -540,22 +751,40 @@ void setup()
         }
     }
 
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(ssid, password);
+    // WIFI
+    WiFi.mode(
+        WIFI_STA
+    );
+
+    WiFi.begin(
+        ssid,
+        password
+    );
 
     int attempts = 0;
-    while (WiFi.status() != WL_CONNECTED && attempts < 40)
+
+    while (
+        WiFi.status() !=
+        WL_CONNECTED &&
+        attempts < 40
+    )
     {
         delay(500);
+
         attempts++;
     }
 
-    if (WiFi.status() == WL_CONNECTED)
+    if (
+        WiFi.status() ==
+        WL_CONNECTED
+    )
     {
         getWifiFix();
     }
 
-    lastImuTime = millis();
+    lastImuTime =
+        millis();
+
     lastStepTime = 0;
 }
 
